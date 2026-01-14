@@ -17,6 +17,12 @@ contract Player is ERC721, Ownable {
         _price = price;
     }
 
+    // Buy the token to play the game.
+    // The player has to pay the price to buy the token.
+    // The token is minted to the player.
+    // The token is soulbound and cannot be transferred.
+    // Each wallet can only have one token. 
+    // This could later be extended to only allow PoPs to buy the token to fight botting.
     function buyToken() public payable {
         require(msg.value >= _price, "Amount must be greater than or equal to the price");
         require(balanceOf(msg.sender) == 0, "Player already has a token");
@@ -39,9 +45,9 @@ contract Player is ERC721, Ownable {
         return _price;
     }
 
-    // -----------------------------
-    // Soulbound enforcement (OZ v5)
-    // -----------------------------
+    // This is to enforce the soulbound nature of the token.
+    // This every transfer must go through this function.
+    // so we revert immediately if its not a mint or burn.
     function _update(address to, uint256 tokenId, address auth)
         internal
         override
@@ -50,6 +56,7 @@ contract Player is ERC721, Ownable {
         from = _ownerOf(tokenId);
 
         // Block transfers: only allow mint (from==0) and burn (to==0)
+        // allowing burns for now, maybe later i could not allow people to burn their token.
         if (from != address(0) && to != address(0)) revert PlayerIsSoulbound();
 
         return super._update(to, tokenId, auth);
