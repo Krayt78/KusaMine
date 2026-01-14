@@ -36,4 +36,17 @@ contract MiningSystem {
         // Update last mine time
         miningComponent.setLastMineTime(playerId, block.timestamp, address(this));
     }
+
+    function calculateMiningPower(uint256 playerId) external view returns (uint256) {
+        address miningComponentAddr = _registry.getComponent(MINING_COMPONENT);
+        require(miningComponentAddr != address(0), "MiningComponent not registered");
+        
+        MiningComponent miningComponent = MiningComponent(miningComponentAddr);
+        Armor armor = Armor(miningComponent.getEquipped(playerId, InventoryComponent.EquipmentSlot.ARMOR));
+        Weapon weapon = Weapon(miningComponent.getEquipped(playerId, InventoryComponent.EquipmentSlot.WEAPON));
+        Relic relic = Relic(miningComponent.getEquipped(playerId, InventoryComponent.EquipmentSlot.RELIC));
+
+        uint256 miningPower = miningComponent.calculateMiningPower(playerId);
+        return miningPower;
+    }
 }
