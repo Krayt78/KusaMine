@@ -2,13 +2,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import "../components/InventoryComponent.sol";
+import "../EquipmentSlot.sol";
 
 interface IEquipable {
     /// @notice Returns the equipment slot this item can be equipped to
     /// @param tokenId The token ID to check
     /// @return The equipment slot type
-    function getEquipmentSlot(uint256 tokenId) external view returns (InventoryComponent.EquipmentSlot);
+    function getEquipmentSlot(uint256 tokenId) external view returns (EquipmentSlot.Slot);
     
     /// @notice Returns item metadata/stats
     /// @param tokenId The token ID to check

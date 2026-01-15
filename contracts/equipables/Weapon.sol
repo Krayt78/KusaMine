@@ -3,7 +3,7 @@
 pragma solidity 0.8.28;
 
 import "../Equipable.sol";
-import "../components/InventoryComponent.sol";
+import "../EquipmentSlot.sol";
 
 /// @title Weapon
 /// @notice Weapon items that can be equipped to the WEAPON slot
@@ -18,6 +18,6 @@ contract Weapon is Equipable {
         uint256 amount,
         bytes memory itemData
     ) external onlyOwner returns (uint256) {
-        return createTokenType(to, amount, InventoryComponent.EquipmentSlot.WEAPON, itemData);
+        return createTokenType(to, amount, EquipmentSlot.Slot.WEAPON, itemData);
     }
 }

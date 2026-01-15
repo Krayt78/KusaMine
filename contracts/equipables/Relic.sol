@@ -3,7 +3,7 @@
 pragma solidity 0.8.28;
 
 import "../Equipable.sol";
-import "../components/InventoryComponent.sol";
+import "../EquipmentSlot.sol";
 
 /// @title Relic
 /// @notice Relic items that can be equipped to the RELIC slot
@@ -18,6 +18,6 @@ contract Relic is Equipable {
         uint256 amount,
         bytes memory itemData
     ) external onlyOwner returns (uint256) {
-        return createTokenType(to, amount, InventoryComponent.EquipmentSlot.RELIC, itemData);
+        return createTokenType(to, amount, EquipmentSlot.Slot.RELIC, itemData);
     }
 }
