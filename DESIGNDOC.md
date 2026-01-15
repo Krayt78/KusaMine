@@ -134,8 +134,10 @@ Each step may roll one of:
 ### 6.3 Combat (Onchain, deterministic)
 Keep combat minimal and cheap.
 
-**Simplification for v1 (recommended)**
+**Simplification for teh start**
 - One-roll combat: “Win and take X damage” or “Fail and get ejected.”
+
+Later on players will be able to choose what to do (run, attack, use object/magic ...)
 
 ---
 
@@ -146,9 +148,8 @@ Keep combat minimal and cheap.
 2. **Commit–reveal:** player commits hash(secret) then reveals secret later.
 3. **Native randomness / RANDAO:** chain-dependent.
 
-### 7.2 Recommendation for v1
+### 7.2 for v1
 - Use **VRF** (or strong chain-native randomness) if available.
-- Bind randomness to a **runId** so players can’t cheaply “reroll” outcomes.
 
 ---
 
@@ -157,6 +158,7 @@ Keep combat minimal and cheap.
 ### 8.1 Contracts / Modules (suggested)
 - **CharacterSBT (ERC-721-like, non-transferable):**
   - minting, stat storage, leveling, equipped slot state
+  - has an EquipmentVault
 - **GameItems1155 (ERC-1155):**
   - all token ids (gold, ores, weapons, armor, relics, etc.)
 - **EquipmentVault (ERC-1155 receiver + accounting):**
@@ -169,39 +171,12 @@ Keep combat minimal and cheap.
 - **Crafting/Forge (optional):**
   - convert ores → items, upgrades, sinks
 
-> Alternative: merge `EquipmentVault` into `CharacterSBT` or `MineSystem`, but keeping a dedicated vault is often cleaner.
-
 ### 8.2 Token ID Strategy (ERC-1155)
-Recommended: **single ERC-1155 contract, many token ids**
 - `1 = GOLD`
 - `2 = IRON`
 - `1001 = WEAPON_BRONZE_SWORD`
 - `2001 = ARMOR_LEATHER`
 - `3001 = RELIC_LUCKY_CHARM`
-
-### 8.3 Storage & Data Model (high level)
-- `characterStats[characterId] => {str,dex,int,luck, level,xp}`
-- `equipped[characterId] => {weaponId, armorId, relicId}`
-- `equippedAmounts[characterId] => {weaponAmt, armorAmt, relicAmt}` (usually 1)
-- `vaultBalance[characterId][tokenId] => amount` (optional if only tracking equipped slots)
-- `activeRun[characterId] => {runId, mineId, depth, step, hp, seedRef, status}`
-
-### 8.4 Equip / Unequip APIs (conceptual)
-- `equip(characterId, slot, tokenId, amount)`
-  - checks caller owns character
-  - checks tokenId is valid for slot type
-  - transfers ERC-1155 from caller wallet to vault
-  - updates equipped state (and handles replacing existing gear)
-- `unequip(characterId, slot)`
-  - checks caller owns character
-  - clears equipped state
-  - transfers ERC-1155 from vault back to caller wallet
-
-**Replacing equipment**
-- If slot already has an item:
-  - auto-unequip previous item back to wallet (or keep it in vault as “inventory” — decide later)
-  - then equip the new one
-
 ---
 
 ## 9. Economy
@@ -211,16 +186,16 @@ Recommended: **single ERC-1155 contract, many token ids**
   - deter sybil/bot farms
   - fund randomness costs / treasury
 
+Later on with PoP we could airdrop SBTs directly to teh players that are Ided by PoP.
+
 ### 9.2 Sources & Sinks
 **Sources**
 - Loot from mining/combat (ERC-1155 mints)
-- Crafting outputs (if implemented)
+- Crafting outputs (implemented later on)
 
 **Sinks**
-- Mine entry fee (scaled by depth)
-- Crafting fees
-- Repair/durability costs (if added)
-- Burning items for dust/upgrade currency (ERC-1155 burn)
+- Upgrade player's attributes (soft cap ala black desert ?)
+- Crafting Inputs
 
 ### 9.3 Trade
 - Character cannot be sold (SBT).
@@ -233,42 +208,24 @@ Recommended: **single ERC-1155 contract, many token ids**
 - UI reads from:
   - contract calls (current state)
   - event logs (history)
-- Optional: deploy UI to IPFS + ENS/contenthash.
+- Optional: deploy UI to IPFS.
 
 ---
 
 ## 11. Security & Abuse Considerations
 
 ### 11.1 Key Risks
-- RNG manipulation / rerolling
-- MEV / transaction ordering
-- Bot farming (many accounts)
-- Vault safety and authorization correctness
-
-### 11.2 Mitigations
-- VRF / commit–reveal; bind outcomes to runId.
-- Entry fees or stamina-like rate limits (careful with UX).
-- Vault: strict access checks (`onlyCharacterOwner`), reentrancy guards, pausable.
-- Clear invariants: an equipped slot must correspond to assets held in the vault.
+- RNG manipulation
+- Balance issues
 
 ---
 
-## 12. MVP Scope (Suggested)
+## 12. MVP Scope
 - Character mint (SBT)
-- Basic stats + leveling
+- Basic stats + upgrading them
 - One ERC-1155 contract for all items/loot/equipment
 - Equipment vault custody model (equip transfers into vault; unequip returns to wallet)
 - 1 mine with depth scaling
 - Step-based exploration (3–10 steps/run)
 - Loot tables: ores + chance of equipment drops (all ERC-1155)
 - Simple combat resolution
-- Basic sinks (entry fees and/or crafting)
-
----
-
-## 13. Open Decisions (To Finalize)
-- Target chain + standards (EVM? specific chain?)
-- Mine run design (single-tx vs step-based vs time-based)
-- Randomness method (VRF vs commit–reveal)
-- Slot replacement behavior (auto-return old gear to wallet vs keep in vault inventory)
-- Whether the vault can also store non-equipped “character inventory” (optional)
