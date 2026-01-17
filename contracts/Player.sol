@@ -4,12 +4,13 @@ pragma solidity 0.8.28;
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
+import "./EquipmentVault.sol";
 
 /// @title Player - A Soulbound ERC721 token representing a player in KusaMine
 /// @author KusaMine Team
 /// @notice This contract manages player tokens that are non-transferable (soulbound)
 /// @dev Players must purchase their token to play the game. Each wallet can only own one token.
-contract Player is ERC721, Ownable {
+contract Player is ERC721, Ownable, EquipmentVault {
     uint256 private _tokenIdCounter;
     uint256 private _price;
     IERC20 private _upgradeToken;
@@ -151,5 +152,31 @@ contract Player is ERC721, Ownable {
         if (from != address(0) && to != address(0)) revert PlayerIsSoulbound();
 
         return super._update(to, tokenId, auth);
+    }
+
+    /// @notice Sets the equipment contract address
+    /// @dev Only callable by the contract owner. Can only be set once.
+    /// @param equipmentContract The address of the equipment contract
+    function setEquipmentContract(address equipmentContract) external onlyOwner {
+        _setEquipmentContract(equipmentContract);
+    }
+
+    /// @notice Checks if the caller owns the specified player token
+    /// @param playerTokenId The player token ID to check
+    /// @return True if the caller owns the token
+    function _ownsPlayerToken(uint256 playerTokenId) internal view override returns (bool) {
+        return ownerOf(playerTokenId) == msg.sender;
+    }
+
+    /// @notice ERC165 support - resolves conflict between ERC721 and EquipmentVault
+    /// @param interfaceId The interface ID to check
+    /// @return True if the interface is supported
+    function supportsInterface(bytes4 interfaceId)
+        public
+        view
+        override(ERC721, EquipmentVault)
+        returns (bool)
+    {
+        return ERC721.supportsInterface(interfaceId) || EquipmentVault.supportsInterface(interfaceId);
     }
 }
