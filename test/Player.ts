@@ -378,4 +378,299 @@ describe("Player", function () {
       });
     });
   });
+
+  describe("upgradeAttribute()", function () {
+    // Enum values matching the contract
+    const Attribute = {
+      Strength: 0,
+      Dexterity: 1,
+      Intelligence: 2,
+      Luck: 3,
+    };
+
+    async function deployWithUpgradeSetupFixture() {
+      const price = hre.ethers.parseEther("0.1");
+      const upgradeCost = hre.ethers.parseEther("100");
+
+      const [owner, otherAccount] = await hre.ethers.getSigners();
+
+      // Deploy MockERC20
+      const MockERC20Factory = await hre.ethers.getContractFactory("MockERC20");
+      const upgradeToken = await MockERC20Factory.deploy("Upgrade Token", "UPG");
+
+      // Deploy Player with zero address initially
+      const Player = await hre.ethers.getContractFactory("Player");
+      const player = await Player.deploy(price, hre.ethers.ZeroAddress);
+
+      // Setup upgrade token and cost
+      await player.connect(owner).setUpgradeToken(await upgradeToken.getAddress());
+      await player.connect(owner).setUpgradeCost(upgradeCost);
+
+      // Mint player token for otherAccount
+      await player.connect(otherAccount).buyToken({ value: price });
+
+      // Mint upgrade tokens to otherAccount and approve
+      await upgradeToken.mint(otherAccount.address, upgradeCost * 10n);
+      await upgradeToken.connect(otherAccount).approve(await player.getAddress(), upgradeCost * 10n);
+
+      return { player, upgradeToken, upgradeCost, price, owner, otherAccount };
+    }
+
+    describe("Happy path", function () {
+      it("Should decrease caller's ERC20 balance by upgradeCost", async function () {
+        const { player, upgradeToken, upgradeCost, otherAccount } = await loadFixture(deployWithUpgradeSetupFixture);
+
+        const balanceBefore = await upgradeToken.balanceOf(otherAccount.address);
+        await player.connect(otherAccount).upgradeAttribute(1, Attribute.Strength);
+        const balanceAfter = await upgradeToken.balanceOf(otherAccount.address);
+
+        expect(balanceBefore - balanceAfter).to.equal(upgradeCost);
+      });
+
+      it("Should increase contract's ERC20 balance by upgradeCost", async function () {
+        const { player, upgradeToken, upgradeCost, otherAccount } = await loadFixture(deployWithUpgradeSetupFixture);
+
+        const balanceBefore = await upgradeToken.balanceOf(await player.getAddress());
+        await player.connect(otherAccount).upgradeAttribute(1, Attribute.Strength);
+        const balanceAfter = await upgradeToken.balanceOf(await player.getAddress());
+
+        expect(balanceAfter - balanceBefore).to.equal(upgradeCost);
+      });
+
+      it("Should increment only the chosen stat by 1", async function () {
+        const { player, otherAccount } = await loadFixture(deployWithUpgradeSetupFixture);
+
+        const attrsBefore = await player.getAttributes(1);
+        await player.connect(otherAccount).upgradeAttribute(1, Attribute.Dexterity);
+        const attrsAfter = await player.getAttributes(1);
+
+        // Dexterity should increase by 1
+        expect(attrsAfter.dexterity).to.equal(attrsBefore.dexterity + 1n);
+        // Other stats unchanged
+        expect(attrsAfter.strenght).to.equal(attrsBefore.strenght);
+        expect(attrsAfter.intelligence).to.equal(attrsBefore.intelligence);
+        expect(attrsAfter.luck).to.equal(attrsBefore.luck);
+      });
+    });
+
+    describe("Each attribute branch", function () {
+      it("Should increment strenght when Strength attribute is chosen", async function () {
+        const { player, otherAccount } = await loadFixture(deployWithUpgradeSetupFixture);
+
+        const attrsBefore = await player.getAttributes(1);
+        await player.connect(otherAccount).upgradeAttribute(1, Attribute.Strength);
+        const attrsAfter = await player.getAttributes(1);
+
+        expect(attrsAfter.strenght).to.equal(attrsBefore.strenght + 1n);
+        expect(attrsAfter.dexterity).to.equal(attrsBefore.dexterity);
+        expect(attrsAfter.intelligence).to.equal(attrsBefore.intelligence);
+        expect(attrsAfter.luck).to.equal(attrsBefore.luck);
+      });
+
+      it("Should increment dexterity when Dexterity attribute is chosen", async function () {
+        const { player, otherAccount } = await loadFixture(deployWithUpgradeSetupFixture);
+
+        const attrsBefore = await player.getAttributes(1);
+        await player.connect(otherAccount).upgradeAttribute(1, Attribute.Dexterity);
+        const attrsAfter = await player.getAttributes(1);
+
+        expect(attrsAfter.strenght).to.equal(attrsBefore.strenght);
+        expect(attrsAfter.dexterity).to.equal(attrsBefore.dexterity + 1n);
+        expect(attrsAfter.intelligence).to.equal(attrsBefore.intelligence);
+        expect(attrsAfter.luck).to.equal(attrsBefore.luck);
+      });
+
+      it("Should increment intelligence when Intelligence attribute is chosen", async function () {
+        const { player, otherAccount } = await loadFixture(deployWithUpgradeSetupFixture);
+
+        const attrsBefore = await player.getAttributes(1);
+        await player.connect(otherAccount).upgradeAttribute(1, Attribute.Intelligence);
+        const attrsAfter = await player.getAttributes(1);
+
+        expect(attrsAfter.strenght).to.equal(attrsBefore.strenght);
+        expect(attrsAfter.dexterity).to.equal(attrsBefore.dexterity);
+        expect(attrsAfter.intelligence).to.equal(attrsBefore.intelligence + 1n);
+        expect(attrsAfter.luck).to.equal(attrsBefore.luck);
+      });
+
+      it("Should increment luck when Luck attribute is chosen", async function () {
+        const { player, otherAccount } = await loadFixture(deployWithUpgradeSetupFixture);
+
+        const attrsBefore = await player.getAttributes(1);
+        await player.connect(otherAccount).upgradeAttribute(1, Attribute.Luck);
+        const attrsAfter = await player.getAttributes(1);
+
+        expect(attrsAfter.strenght).to.equal(attrsBefore.strenght);
+        expect(attrsAfter.dexterity).to.equal(attrsBefore.dexterity);
+        expect(attrsAfter.intelligence).to.equal(attrsBefore.intelligence);
+        expect(attrsAfter.luck).to.equal(attrsBefore.luck + 1n);
+      });
+    });
+
+    describe("Revert cases", function () {
+      it("Should revert when caller is not the token owner", async function () {
+        const { player, owner } = await loadFixture(deployWithUpgradeSetupFixture);
+
+        // owner does not own token 1 (otherAccount does)
+        await expect(
+          player.connect(owner).upgradeAttribute(1, Attribute.Strength)
+        ).to.be.revertedWith("Not the token owner");
+      });
+
+      it("Should revert when upgrade token is zero address", async function () {
+        const { player, price, otherAccount } = await loadFixture(deployPlayerFixture);
+
+        // Buy token but don't set upgrade token
+        await player.connect(otherAccount).buyToken({ value: price });
+
+        await expect(
+          player.connect(otherAccount).upgradeAttribute(1, Attribute.Strength)
+        ).to.be.revertedWith("Upgrade token not set");
+      });
+
+      it("Should revert when upgrade cost is 0", async function () {
+        const { player, price, owner, otherAccount } = await loadFixture(deployPlayerFixture);
+
+        // Deploy and set upgrade token but not cost
+        const MockERC20Factory = await hre.ethers.getContractFactory("MockERC20");
+        const upgradeToken = await MockERC20Factory.deploy("Upgrade Token", "UPG");
+        await player.connect(owner).setUpgradeToken(await upgradeToken.getAddress());
+
+        await player.connect(otherAccount).buyToken({ value: price });
+
+        await expect(
+          player.connect(otherAccount).upgradeAttribute(1, Attribute.Strength)
+        ).to.be.revertedWith("Upgrade cost not set");
+      });
+
+      it("Should revert when caller has insufficient balance", async function () {
+        const { player, price, owner, otherAccount } = await loadFixture(deployPlayerFixture);
+        const upgradeCost = hre.ethers.parseEther("100");
+
+        // Setup upgrade token and cost
+        const MockERC20Factory = await hre.ethers.getContractFactory("MockERC20");
+        const upgradeToken = await MockERC20Factory.deploy("Upgrade Token", "UPG");
+        await player.connect(owner).setUpgradeToken(await upgradeToken.getAddress());
+        await player.connect(owner).setUpgradeCost(upgradeCost);
+
+        await player.connect(otherAccount).buyToken({ value: price });
+
+        // Don't mint any tokens, just approve
+        await upgradeToken.connect(otherAccount).approve(await player.getAddress(), upgradeCost);
+
+        await expect(
+          player.connect(otherAccount).upgradeAttribute(1, Attribute.Strength)
+        ).to.be.reverted; // ERC20 will revert with insufficient balance
+      });
+
+      it("Should revert when caller has insufficient allowance", async function () {
+        const { player, price, owner, otherAccount } = await loadFixture(deployPlayerFixture);
+        const upgradeCost = hre.ethers.parseEther("100");
+
+        // Setup upgrade token and cost
+        const MockERC20Factory = await hre.ethers.getContractFactory("MockERC20");
+        const upgradeToken = await MockERC20Factory.deploy("Upgrade Token", "UPG");
+        await player.connect(owner).setUpgradeToken(await upgradeToken.getAddress());
+        await player.connect(owner).setUpgradeCost(upgradeCost);
+
+        await player.connect(otherAccount).buyToken({ value: price });
+
+        // Mint tokens but don't approve
+        await upgradeToken.mint(otherAccount.address, upgradeCost);
+
+        await expect(
+          player.connect(otherAccount).upgradeAttribute(1, Attribute.Strength)
+        ).to.be.reverted; // ERC20 will revert with insufficient allowance
+      });
+
+      it("Should revert with 'Token transfer failed' when ERC20 returns false", async function () {
+        const { player, price, owner, otherAccount } = await loadFixture(deployPlayerFixture);
+        const upgradeCost = hre.ethers.parseEther("100");
+
+        // Deploy MockERC20ReturnsFalse
+        const MockERC20ReturnsFalseFactory = await hre.ethers.getContractFactory("MockERC20ReturnsFalse");
+        const falseToken = await MockERC20ReturnsFalseFactory.deploy();
+
+        await player.connect(owner).setUpgradeToken(await falseToken.getAddress());
+        await player.connect(owner).setUpgradeCost(upgradeCost);
+
+        await player.connect(otherAccount).buyToken({ value: price });
+
+        // Mint and approve
+        await falseToken.mint(otherAccount.address, upgradeCost);
+        await falseToken.connect(otherAccount).approve(await player.getAddress(), upgradeCost);
+
+        await expect(
+          player.connect(otherAccount).upgradeAttribute(1, Attribute.Strength)
+        ).to.be.revertedWith("Token transfer failed");
+      });
+    });
+
+    describe("State integrity on revert", function () {
+      it("Should not change attributes when revert occurs", async function () {
+        const { player, price, owner, otherAccount } = await loadFixture(deployPlayerFixture);
+        const upgradeCost = hre.ethers.parseEther("100");
+
+        // Setup with false-returning ERC20
+        const MockERC20ReturnsFalseFactory = await hre.ethers.getContractFactory("MockERC20ReturnsFalse");
+        const falseToken = await MockERC20ReturnsFalseFactory.deploy();
+
+        await player.connect(owner).setUpgradeToken(await falseToken.getAddress());
+        await player.connect(owner).setUpgradeCost(upgradeCost);
+
+        await player.connect(otherAccount).buyToken({ value: price });
+        await falseToken.mint(otherAccount.address, upgradeCost);
+        await falseToken.connect(otherAccount).approve(await player.getAddress(), upgradeCost);
+
+        const attrsBefore = await player.getAttributes(1);
+
+        // Attempt upgrade (will revert)
+        await expect(
+          player.connect(otherAccount).upgradeAttribute(1, Attribute.Strength)
+        ).to.be.revertedWith("Token transfer failed");
+
+        // Verify attributes unchanged
+        const attrsAfter = await player.getAttributes(1);
+        expect(attrsAfter.strenght).to.equal(attrsBefore.strenght);
+        expect(attrsAfter.dexterity).to.equal(attrsBefore.dexterity);
+        expect(attrsAfter.intelligence).to.equal(attrsBefore.intelligence);
+        expect(attrsAfter.luck).to.equal(attrsBefore.luck);
+      });
+    });
+
+    describe("Reentrancy protection", function () {
+      it("Should not allow double upgrade via reentrancy", async function () {
+        const { player, price, owner, otherAccount } = await loadFixture(deployPlayerFixture);
+        const upgradeCost = hre.ethers.parseEther("100");
+
+        // Deploy MaliciousERC20
+        const MaliciousERC20Factory = await hre.ethers.getContractFactory("MaliciousERC20");
+        const maliciousToken = await MaliciousERC20Factory.deploy();
+
+        await player.connect(owner).setUpgradeToken(await maliciousToken.getAddress());
+        await player.connect(owner).setUpgradeCost(upgradeCost);
+
+        await player.connect(otherAccount).buyToken({ value: price });
+
+        // Mint enough for multiple upgrades and approve
+        await maliciousToken.mint(otherAccount.address, upgradeCost * 5n);
+        await maliciousToken.connect(otherAccount).approve(await player.getAddress(), upgradeCost * 5n);
+
+        // Set reentrancy params
+        await maliciousToken.setReentrancyParams(await player.getAddress(), 1, Attribute.Strength);
+
+        const attrsBefore = await player.getAttributes(1);
+
+        // The reentrancy attempt should fail because msg.sender in the reentrant call
+        // will be the malicious token contract, not the player owner
+        await expect(
+          player.connect(otherAccount).upgradeAttribute(1, Attribute.Strength)
+        ).to.be.revertedWith("Not the token owner");
+
+        // Verify attributes unchanged (transaction reverted)
+        const attrsAfter = await player.getAttributes(1);
+        expect(attrsAfter.strenght).to.equal(attrsBefore.strenght);
+      });
+    });
+  });
 });
