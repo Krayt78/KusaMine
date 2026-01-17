@@ -15,17 +15,41 @@ describe("Player", function () {
     return { player, price, owner, otherAccount };
   }
 
-  describe("Deployment", function () {
-    it("Should set the right price", async function () {
+  describe("Deployment + Initialization", function () {
+    it("Should set name correctly to 'KusaMine Player'", async function () {
+      const { player } = await loadFixture(deployPlayerFixture);
+
+      expect(await player.name()).to.equal("KusaMine Player");
+    });
+
+    it("Should set symbol correctly to 'KMPLAYER'", async function () {
+      const { player } = await loadFixture(deployPlayerFixture);
+
+      expect(await player.symbol()).to.equal("KMPLAYER");
+    });
+
+    it("Should set the owner to the deployer", async function () {
+      const { player, owner } = await loadFixture(deployPlayerFixture);
+
+      expect(await player.owner()).to.equal(owner.address);
+    });
+
+    it("Should set the initial price to the constructor price", async function () {
       const { player, price } = await loadFixture(deployPlayerFixture);
 
       expect(await player.getPrice()).to.equal(price);
     });
 
-    it("Should set the right owner", async function () {
-      const { player, owner } = await loadFixture(deployPlayerFixture);
+    it("Should set the initial upgrade token to the constructor upgradeToken", async function () {
+      const { player } = await loadFixture(deployPlayerFixture);
 
-      expect(await player.owner()).to.equal(owner.address);
+      expect(await player.getUpgradeToken()).to.equal(hre.ethers.ZeroAddress);
+    });
+
+    it("Should have initial upgrade cost equal to 0", async function () {
+      const { player } = await loadFixture(deployPlayerFixture);
+
+      expect(await player.getUpgradeCost()).to.equal(0);
     });
 
     it("Should have zero tokens minted initially", async function () {
