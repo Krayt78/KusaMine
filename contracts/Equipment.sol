@@ -11,16 +11,19 @@ import "./interfaces/IEquipable.sol";
 /// @notice Base contract for all equipable items (armor, weapons, relics)
 /// @dev Each token type stores its equipment slot type and can have custom metadata
 /// @dev Uses ERC1155 for gas-efficient batch operations and multiple token types
-abstract contract Equipable is ERC1155, Ownable, IEquipable {
+contract Equiment is ERC1155, Ownable, IEquipable {
     using Strings for uint256;
     
     uint256 private _tokenTypeCounter;
-    
-    // Mapping: tokenType => equipment slot
-    mapping(uint256 => EquipmentSlot.Slot) private _equipmentSlots;
-    
-    // Mapping: tokenType => item data (for stats, rarity, etc.)
-    mapping(uint256 => bytes) private _itemData;
+
+    /// @notice Structure combining equipment slot and item data
+    struct EquipmentData {
+        EquipmentSlot.Slot slot;
+        bytes itemData;
+    }
+
+    // Mapping: tokenType => equipment data
+    mapping(uint256 => EquipmentData) private _equipment;
     
     // Base URI for token metadata
     string private _baseTokenURI;
@@ -52,12 +55,14 @@ abstract contract Equipable is ERC1155, Ownable, IEquipable {
     ) internal onlyOwner returns (uint256 tokenType) {
         _tokenTypeCounter += 1;
         tokenType = _tokenTypeCounter;
-        
-        _equipmentSlots[tokenType] = slot;
-        _itemData[tokenType] = itemData;
-        
+
+        _equipment[tokenType] = EquipmentData({
+            slot: slot,
+            itemData: itemData
+        });
+
         _mint(to, tokenType, amount, "");
-        
+
         emit ItemTypeCreated(tokenType, slot, itemData);
     }
     
@@ -70,12 +75,12 @@ abstract contract Equipable is ERC1155, Ownable, IEquipable {
         uint256 tokenType,
         uint256 amount
     ) external onlyOwner {
-        require(_equipmentSlots[tokenType] != EquipmentSlot.Slot.ARMOR || 
-                _equipmentSlots[tokenType] != EquipmentSlot.Slot.WEAPON ||
-                _equipmentSlots[tokenType] != EquipmentSlot.Slot.RELIC ||
-                _equipmentSlots[tokenType] == EquipmentSlot.Slot.ARMOR ||
-                _equipmentSlots[tokenType] == EquipmentSlot.Slot.WEAPON ||
-                _equipmentSlots[tokenType] == EquipmentSlot.Slot.RELIC,
+        require(_equipment[tokenType].slot != EquipmentSlot.Slot.ARMOR ||
+                _equipment[tokenType].slot != EquipmentSlot.Slot.WEAPON ||
+                _equipment[tokenType].slot != EquipmentSlot.Slot.RELIC ||
+                _equipment[tokenType].slot == EquipmentSlot.Slot.ARMOR ||
+                _equipment[tokenType].slot == EquipmentSlot.Slot.WEAPON ||
+                _equipment[tokenType].slot == EquipmentSlot.Slot.RELIC,
                 "Token type does not exist");
         _mint(to, tokenType, amount, "");
     }
@@ -98,8 +103,10 @@ abstract contract Equipable is ERC1155, Ownable, IEquipable {
         for (uint256 i = 0; i < to.length; i++) {
             _tokenTypeCounter += 1;
             tokenTypes[i] = _tokenTypeCounter;
-            _equipmentSlots[tokenTypes[i]] = slots[i];
-            _itemData[tokenTypes[i]] = itemDataArray[i];
+            _equipment[tokenTypes[i]] = EquipmentData({
+                slot: slots[i],
+                itemData: itemDataArray[i]
+            });
             emit ItemTypeCreated(tokenTypes[i], slots[i], itemDataArray[i]);
         }
         
@@ -116,11 +123,11 @@ abstract contract Equipable is ERC1155, Ownable, IEquipable {
         override 
         returns (EquipmentSlot.Slot) 
     {
-        require(_equipmentSlots[tokenType] == EquipmentSlot.Slot.ARMOR ||
-                _equipmentSlots[tokenType] == EquipmentSlot.Slot.WEAPON ||
-                _equipmentSlots[tokenType] == EquipmentSlot.Slot.RELIC,
+        require(_equipment[tokenType].slot == EquipmentSlot.Slot.ARMOR ||
+                _equipment[tokenType].slot == EquipmentSlot.Slot.WEAPON ||
+                _equipment[tokenType].slot == EquipmentSlot.Slot.RELIC,
                 "Token type does not exist");
-        return _equipmentSlots[tokenType];
+        return _equipment[tokenType].slot;
     }
     
     /// @notice Get item data for a token type
@@ -130,11 +137,11 @@ abstract contract Equipable is ERC1155, Ownable, IEquipable {
         override 
         returns (bytes memory) 
     {
-        require(_equipmentSlots[tokenType] == EquipmentSlot.Slot.ARMOR ||
-                _equipmentSlots[tokenType] == EquipmentSlot.Slot.WEAPON ||
-                _equipmentSlots[tokenType] == EquipmentSlot.Slot.RELIC,
+        require(_equipment[tokenType].slot == EquipmentSlot.Slot.ARMOR ||
+                _equipment[tokenType].slot == EquipmentSlot.Slot.WEAPON ||
+                _equipment[tokenType].slot == EquipmentSlot.Slot.RELIC,
                 "Token type does not exist");
-        return _itemData[tokenType];
+        return _equipment[tokenType].itemData;
     }
     
     /// @notice Set base URI for token metadata
@@ -162,8 +169,8 @@ abstract contract Equipable is ERC1155, Ownable, IEquipable {
     
     /// @notice Check if a token type exists
     function tokenTypeExists(uint256 tokenType) external view returns (bool) {
-        return _equipmentSlots[tokenType] == EquipmentSlot.Slot.ARMOR ||
-               _equipmentSlots[tokenType] == EquipmentSlot.Slot.WEAPON ||
-               _equipmentSlots[tokenType] == EquipmentSlot.Slot.RELIC;
+        return _equipment[tokenType].slot == EquipmentSlot.Slot.ARMOR ||
+               _equipment[tokenType].slot == EquipmentSlot.Slot.WEAPON ||
+               _equipment[tokenType].slot == EquipmentSlot.Slot.RELIC;
     }
 }
