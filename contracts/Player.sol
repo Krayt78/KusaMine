@@ -13,6 +13,13 @@ contract Player is ERC721, Ownable {
 
     error PlayerIsSoulbound();
 
+    struct Attributes {
+        uint64 strenght;
+        uint64 dexterity;
+        uint64 intelligence;
+        uint64 luck;
+    }
+
     constructor(uint256 price) ERC721("KusaMine Player", "KMPLAYER") Ownable(msg.sender) {
         _price = price;
     }
