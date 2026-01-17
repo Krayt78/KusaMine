@@ -171,4 +171,129 @@ describe("Player", function () {
       });
     });
   });
+
+  describe("Soulbound enforcement", function () {
+    describe("Transfer blocking", function () {
+      it("Should revert transferFrom with PlayerIsSoulbound", async function () {
+        const { player, price, owner, otherAccount } = await loadFixture(deployPlayerFixture);
+
+        await player.connect(owner).buyToken({ value: price });
+
+        await expect(
+          player.connect(owner).transferFrom(owner.address, otherAccount.address, 1)
+        ).to.be.revertedWithCustomError(player, "PlayerIsSoulbound");
+      });
+
+      it("Should revert safeTransferFrom with PlayerIsSoulbound", async function () {
+        const { player, price, owner, otherAccount } = await loadFixture(deployPlayerFixture);
+
+        await player.connect(owner).buyToken({ value: price });
+
+        await expect(
+          player.connect(owner)["safeTransferFrom(address,address,uint256)"](
+            owner.address,
+            otherAccount.address,
+            1
+          )
+        ).to.be.revertedWithCustomError(player, "PlayerIsSoulbound");
+      });
+
+      it("Should revert safeTransferFrom with data with PlayerIsSoulbound", async function () {
+        const { player, price, owner, otherAccount } = await loadFixture(deployPlayerFixture);
+
+        await player.connect(owner).buyToken({ value: price });
+
+        await expect(
+          player.connect(owner)["safeTransferFrom(address,address,uint256,bytes)"](
+            owner.address,
+            otherAccount.address,
+            1,
+            "0x"
+          )
+        ).to.be.revertedWithCustomError(player, "PlayerIsSoulbound");
+      });
+    });
+
+    describe("Approvals", function () {
+      it("Should allow approve() to succeed", async function () {
+        const { player, price, owner, otherAccount } = await loadFixture(deployPlayerFixture);
+
+        await player.connect(owner).buyToken({ value: price });
+
+        await player.connect(owner).approve(otherAccount.address, 1);
+
+        expect(await player.getApproved(1)).to.equal(otherAccount.address);
+      });
+
+      it("Should allow setApprovalForAll() to succeed", async function () {
+        const { player, price, owner, otherAccount } = await loadFixture(deployPlayerFixture);
+
+        await player.connect(owner).buyToken({ value: price });
+
+        await player.connect(owner).setApprovalForAll(otherAccount.address, true);
+
+        expect(await player.isApprovedForAll(owner.address, otherAccount.address)).to.be.true;
+      });
+
+      it("Should still revert transfer even when approved", async function () {
+        const { player, price, owner, otherAccount } = await loadFixture(deployPlayerFixture);
+
+        await player.connect(owner).buyToken({ value: price });
+        await player.connect(owner).approve(otherAccount.address, 1);
+
+        await expect(
+          player.connect(otherAccount).transferFrom(owner.address, otherAccount.address, 1)
+        ).to.be.revertedWithCustomError(player, "PlayerIsSoulbound");
+      });
+
+      it("Should still revert transfer even when approved for all", async function () {
+        const { player, price, owner, otherAccount } = await loadFixture(deployPlayerFixture);
+
+        await player.connect(owner).buyToken({ value: price });
+        await player.connect(owner).setApprovalForAll(otherAccount.address, true);
+
+        await expect(
+          player.connect(otherAccount).transferFrom(owner.address, otherAccount.address, 1)
+        ).to.be.revertedWithCustomError(player, "PlayerIsSoulbound");
+      });
+    });
+  });
+
+  describe("View functions", function () {
+    it("getPrice() should return the current price", async function () {
+      const { player, price } = await loadFixture(deployPlayerFixture);
+
+      expect(await player.getPrice()).to.equal(price);
+    });
+
+    it("getTokenIdCounter() should return the minted count", async function () {
+      const { player, price, owner, otherAccount } = await loadFixture(deployPlayerFixture);
+
+      expect(await player.getTokenIdCounter()).to.equal(0);
+
+      await player.connect(owner).buyToken({ value: price });
+      expect(await player.getTokenIdCounter()).to.equal(1);
+
+      await player.connect(otherAccount).buyToken({ value: price });
+      expect(await player.getTokenIdCounter()).to.equal(2);
+    });
+
+    it("getAttributes() should revert with 'Token does not exist' for non-existent token", async function () {
+      const { player } = await loadFixture(deployPlayerFixture);
+
+      await expect(player.getAttributes(999)).to.be.revertedWith("Token does not exist");
+    });
+
+    it("getAttributes() should return attributes for existing token", async function () {
+      const { player, price, owner } = await loadFixture(deployPlayerFixture);
+
+      await player.connect(owner).buyToken({ value: price });
+
+      const attributes = await player.getAttributes(1);
+      expect(attributes.strenght).to.equal(10);
+      expect(attributes.dexterity).to.equal(10);
+      expect(attributes.intelligence).to.equal(10);
+      expect(attributes.luck).to.equal(10);
+    });
+  });
 });
