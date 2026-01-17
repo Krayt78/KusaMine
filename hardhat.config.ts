@@ -15,6 +15,24 @@ const config: HardhatUserConfig = {
       accounts: [vars.get("PRIVATE_KEY")],
     },
   },
+  sourcify: {
+  enabled: true
+  },
+  etherscan: {
+    apiKey: {
+      paseoAssetHub: vars.get("SUBSCAN_API_KEY")
+    },
+    customChains: [
+      {
+        network: "paseoAssetHub",
+        chainId: 420420422,
+        urls: {
+          apiURL: "https://passet-hub.api.subscan.io/api/scan/evm/contract/verifysource",
+          browserURL: "https://passet-hub.subscan.io"
+        }
+      }
+    ]
+  }
 };
 
 export default config;
