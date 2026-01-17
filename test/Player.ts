@@ -296,4 +296,86 @@ describe("Player", function () {
       expect(attributes.luck).to.equal(10);
     });
   });
+
+  describe("Owner-only admin setters", function () {
+    describe("updatePrice()", function () {
+      it("Should allow owner to update price", async function () {
+        const { player, owner } = await loadFixture(deployPlayerFixture);
+        const newPrice = hre.ethers.parseEther("0.5");
+
+        await player.connect(owner).updatePrice(newPrice);
+
+        expect(await player.getPrice()).to.equal(newPrice);
+      });
+
+      it("Should revert when non-owner calls updatePrice", async function () {
+        const { player, otherAccount } = await loadFixture(deployPlayerFixture);
+        const newPrice = hre.ethers.parseEther("0.5");
+
+        await expect(
+          player.connect(otherAccount).updatePrice(newPrice)
+        ).to.be.revertedWithCustomError(player, "OwnableUnauthorizedAccount")
+          .withArgs(otherAccount.address);
+      });
+    });
+
+    describe("setUpgradeToken()", function () {
+      it("Should allow owner to set upgrade token", async function () {
+        const { player, owner, otherAccount } = await loadFixture(deployPlayerFixture);
+        const newTokenAddress = otherAccount.address; // Using as a dummy address
+
+        await player.connect(owner).setUpgradeToken(newTokenAddress);
+
+        expect(await player.getUpgradeToken()).to.equal(newTokenAddress);
+      });
+
+      it("Should revert when non-owner calls setUpgradeToken", async function () {
+        const { player, otherAccount } = await loadFixture(deployPlayerFixture);
+        const newTokenAddress = otherAccount.address;
+
+        await expect(
+          player.connect(otherAccount).setUpgradeToken(newTokenAddress)
+        ).to.be.revertedWithCustomError(player, "OwnableUnauthorizedAccount")
+          .withArgs(otherAccount.address);
+      });
+    });
+
+    describe("setUpgradeCost()", function () {
+      it("Should allow owner to set upgrade cost", async function () {
+        const { player, owner } = await loadFixture(deployPlayerFixture);
+        const newCost = hre.ethers.parseEther("100");
+
+        await player.connect(owner).setUpgradeCost(newCost);
+
+        expect(await player.getUpgradeCost()).to.equal(newCost);
+      });
+
+      it("Should revert when non-owner calls setUpgradeCost", async function () {
+        const { player, otherAccount } = await loadFixture(deployPlayerFixture);
+        const newCost = hre.ethers.parseEther("100");
+
+        await expect(
+          player.connect(otherAccount).setUpgradeCost(newCost)
+        ).to.be.revertedWithCustomError(player, "OwnableUnauthorizedAccount")
+          .withArgs(otherAccount.address);
+      });
+    });
+
+    describe("Sanity checks after updates", function () {
+      it("Should reflect all changes after multiple updates", async function () {
+        const { player, owner, otherAccount } = await loadFixture(deployPlayerFixture);
+        const newPrice = hre.ethers.parseEther("0.25");
+        const newTokenAddress = otherAccount.address;
+        const newCost = hre.ethers.parseEther("50");
+
+        await player.connect(owner).updatePrice(newPrice);
+        await player.connect(owner).setUpgradeToken(newTokenAddress);
+        await player.connect(owner).setUpgradeCost(newCost);
+
+        expect(await player.getPrice()).to.equal(newPrice);
+        expect(await player.getUpgradeToken()).to.equal(newTokenAddress);
+        expect(await player.getUpgradeCost()).to.equal(newCost);
+      });
+    });
+  });
 });
