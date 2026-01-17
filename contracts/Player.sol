@@ -2,6 +2,7 @@
 pragma solidity 0.8.28;
 
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
 // Player is a SoulBound token that is used to represent a player in the game.
@@ -10,8 +11,12 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 contract Player is ERC721, Ownable {
     uint256 private _tokenIdCounter;
     uint256 private _price;
+    IERC20 private _upgradeToken;
+    uint256 private _upgradeCost;
 
     error PlayerIsSoulbound();
+
+    enum Attribute { Strength, Dexterity, Intelligence, Luck }
 
     struct Attributes {
         uint64 strenght;
@@ -20,8 +25,11 @@ contract Player is ERC721, Ownable {
         uint64 luck;
     }
 
-    constructor(uint256 price) ERC721("KusaMine Player", "KMPLAYER") Ownable(msg.sender) {
+    mapping(uint256 tokenId => Attributes) private _tokenAttributes;
+
+    constructor(uint256 price, address upgradeToken) ERC721("KusaMine Player", "KMPLAYER") Ownable(msg.sender) {
         _price = price;
+        _upgradeToken = IERC20(upgradeToken);
     }
 
     // Buy the token to play the game.
@@ -35,6 +43,7 @@ contract Player is ERC721, Ownable {
         require(balanceOf(msg.sender) == 0, "Player already has a token");
         _tokenIdCounter += 1;
         _safeMint(msg.sender, _tokenIdCounter);
+        _tokenAttributes[_tokenIdCounter] = Attributes(10, 10, 10, 10);
     }
 
     function getTokenIdCounter() public view returns (uint256) {
@@ -50,6 +59,46 @@ contract Player is ERC721, Ownable {
 
     function getPrice() public view returns (uint256) {
         return _price;
+    }
+
+    function getAttributes(uint256 tokenId) public view returns (Attributes memory) {
+        require(_ownerOf(tokenId) != address(0), "Token does not exist");
+        return _tokenAttributes[tokenId];
+    }
+
+    function setUpgradeToken(address token) external onlyOwner {
+        _upgradeToken = IERC20(token);
+    }
+
+    function setUpgradeCost(uint256 cost) external onlyOwner {
+        _upgradeCost = cost;
+    }
+
+    function getUpgradeToken() public view returns (address) {
+        return address(_upgradeToken);
+    }
+
+    function getUpgradeCost() public view returns (uint256) {
+        return _upgradeCost;
+    }
+
+    function upgradeAttribute(uint256 tokenId, Attribute attribute) external {
+        require(ownerOf(tokenId) == msg.sender, "Not the token owner");
+        require(address(_upgradeToken) != address(0), "Upgrade token not set");
+        require(_upgradeCost > 0, "Upgrade cost not set");
+
+        bool success = _upgradeToken.transferFrom(msg.sender, address(this), _upgradeCost);
+        require(success, "Token transfer failed");
+
+        if (attribute == Attribute.Strength) {
+            _tokenAttributes[tokenId].strenght += 1;
+        } else if (attribute == Attribute.Dexterity) {
+            _tokenAttributes[tokenId].dexterity += 1;
+        } else if (attribute == Attribute.Intelligence) {
+            _tokenAttributes[tokenId].intelligence += 1;
+        } else if (attribute == Attribute.Luck) {
+            _tokenAttributes[tokenId].luck += 1;
+        }
     }
 
     // This is to enforce the soulbound nature of the token.
